@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Assessment Board - Regularización 2026</title>
+<!-- Tailwind CSS for styling -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- React & ReactDOM -->
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<!-- Babel for JSX compilation -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+        font-family: 'Inter', sans-serif;
+        overflow: hidden; /* Prevent native scroll to use custom panning */
+        margin: 0;
+        padding: 0;
+        background-color: #f8f9fa;
+    }
+        /* Custom Miro-like background pattern */
+        .miro-bg {
+        background-color: #f4f4f5;
+        background-image: radial-gradient(#d4d4d8 1.5px, transparent 1.5px);
+        background-size: 24px 24px;
+    }
+        .node-card {
+        transition: box-shadow 0.2s ease, transform 0.1s ease;
+    }
+        .node-card:active {
+        transform: scale(0.98);
+    }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    // ============================================================================
+    // DATOS DEL ASSESSMENT (ARCHIVO BASE)
+    // Puedes modificar estas dos variables (defaultNodes y defaultEdges)
+    // para mapear las reglas de CUALQUIER otro tipo de visado.
+    // ============================================================================
+
+    const regularizacionNodes = [
+    // Módulo de Inicio
+    { id: 'start', x: 600, y: 50, title: 'INICIO: Reg. Extraordinaria', text: 'Evaluación de elegibilidad\nReal Decreto 316/2026', type: 'start' },
+
+    // Módulo 1: Filtros Excluyentes
+    { id: 'q1', x: 600, y: 200, title: 'Filtro 1: Llegada', text: '¿Llegó a España antes del 01/01/2026?', type: 'filter' },
+    { id: 'q2', x: 600, y: 350, title: 'Filtro 2: Permanencia', text: '¿Ha permanecido al menos 5 meses ininterrumpidos?', type: 'filter' },
+    { id: 'q3', x: 600, y: 500, title: 'Filtro 3: Penales', text: '¿Tiene antecedentes penales en los últimos 5 años?', type: 'filter' },
+    { id: 'q4', x: 600, y: 650, title: 'Filtro 4: Expulsión', text: '¿Tiene prohibición de entrada o alerta de expulsión?', type: 'filter' },
+
+    // Nodo de Rechazo
+    { id: 'fail', x: 1000, y: 400, title: '❌ No Elegible', text: 'El solicitante no cumple con los criterios básicos excluyentes para esta vía.', type: 'error' },
+
+    // Módulo 2: Bifurcación
+    { id: 'q5', x: 600, y: 800, title: 'Perfil del Solicitante', text: 'Determine la situación actual del extranjero:', type: 'branch' },
+
+    // Módulo 3: Rutas de Resultados y Checklists
+    { id: 'rutaA', x: 200, y: 1000, title: '📄 Ruta A: Asilo', text: '• Solicitud de asilo previa al 01/01/2026\n• Pasaporte válido/caducado\n• Resguardo asilo (tarjeta roja/blanca)\n• Pruebas permanencia 5 meses\n• Tasa 052\n• Formulario EX31', type: 'result' },
+    { id: 'rutaB', x: 600, y: 1000, title: '💼 Ruta B: General', text: '• Irregular previa al 01/01/2026\n• Pasaporte\n• Pruebas de llegada a España\n• Pruebas permanencia 5 meses\n• Doc. Laboral / Familiar / Vulnerabilidad\n• Tasa 052\n• Formulario EX32', type: 'result' },
+    { id: 'rutaC', x: 1000, y: 1000, title: '🧒 Ruta C: Menores', text: '• Hijo/a de solicitante o residente\n• Pasaporte\n• Certificado Nacimiento\n• Doc. del progenitor\n• Exento de demostrar medios económicos', type: 'result' },
+    ];
+
+    const regularizacionEdges = [
+    // Inicio a Q1
+    { id: 'e-start-q1', from: 'start', to: 'q1', label: 'Iniciar' },
+
+    // Lógica de Filtros (Si/No)
+    { id: 'e-q1-q2', from: 'q1', to: 'q2', label: 'SÍ' },
+    { id: 'e-q1-fail', from: 'q1', to: 'fail', label: 'NO' },
+
+    { id: 'e-q2-q3', from: 'q2', to: 'q3', label: 'SÍ' },
+    { id: 'e-q2-fail', from: 'q2', to: 'fail', label: 'NO' },
+
+    // Atención: La lógica de antecedentes es inversa (NO es lo bueno)
+    { id: 'e-q3-q4', from: 'q3', to: 'q4', label: 'NO' },
+    { id: 'e-q3-fail', from: 'q3', to: 'fail', label: 'SÍ' },
+
+    { id: 'e-q4-q5', from: 'q4', to: 'q5', label: 'NO' },
+    { id: 'e-q4-fail', from: 'q4', to: 'fail', label: 'SÍ' },
+
+    // Lógica de Rutas
+    { id: 'e-q5-rutaA', from: 'q5', to: 'rutaA', label: 'Opción A: Solicitante Asilo' },
+    { id: 'e-q5-rutaB', from: 'q5', to: 'rutaB', label: 'Opción B: Irregular General' },
+    { id: 'e-q5-rutaC', from: 'q5', to: 'rutaC', label: 'Opción C: Menor Edad' },
+    ];
+
+    // ============================================================================
+    // DATOS DEL ASSESSMENT: NÓMADA DIGITAL (Ley de Startups)
+    // ============================================================================
+
+    const nomadNodes = [
+    { id: 'start_dn', x: 600, y: 50, title: 'INICIO: Nómada Digital', text: 'Teletrabajador de Carácter Internacional\n(Ley de Startups 28/2022)', type: 'start' },
+
+    { id: 'dn_q1', x: 600, y: 200, title: 'Filtro 1: Naturaleza del Trabajo', text: '¿Su trabajo se realiza de forma exclusiva por medios y sistemas informáticos/telemáticos?', type: 'filter' },
+    { id: 'dn_fail_1', x: 1000, y: 200, title: '❌ No Elegible', text: 'El trabajo debe ser 100% en remoto mediante medios telemáticos.', type: 'error' },
+
+    { id: 'dn_branch_1', x: 600, y: 350, title: 'Tipo de Trabajador', text: '¿Cuál es su relación laboral?', type: 'branch' },
+
+    // Empleado por cuenta ajena
+    { id: 'dn_q_emp_1', x: 400, y: 500, title: 'Filtro: Antigüedad Empresa', text: '¿La empresa extranjera tiene actividad continuada de al menos 1 año?', type: 'filter' },
+    { id: 'dn_q_emp_2', x: 400, y: 650, title: 'Filtro: Relación Laboral', text: '¿Lleva al menos 3 meses trabajando para esta empresa y tiene permiso para teletrabajar en España?', type: 'filter' },
+
+    // Trabajador por cuenta propia (Freelance)
+    { id: 'dn_q_free_1', x: 800, y: 500, title: 'Filtro: Clientes', text: '¿Sus ingresos de empresas españolas representan un máximo del 20% del total?', type: 'filter' },
+    { id: 'dn_q_free_2', x: 800, y: 650, title: 'Filtro: Relación Comercial', text: '¿Tiene una relación mercantil con empresas extranjeras de más de 1 año y contratos actuales vigentes (min 3 meses)?', type: 'filter' },
+
+    { id: 'dn_fail_2', x: 1200, y: 575, title: '❌ Requisitos Laborales', text: 'No cumple con la antigüedad requerida de la empresa/clientes o el tiempo de relación laboral.', type: 'error' },
+
+    // Confluencia de Requisitos Generales
+    { id: 'dn_q_qual', x: 600, y: 800, title: 'Filtro 3: Cualificación', text: '¿Es graduado universitario/FP grado superior de prestigio, O BIEN tiene al menos 3 años de experiencia profesional demostrable?', type: 'filter' },
+    { id: 'dn_q_inc', x: 600, y: 950, title: 'Filtro 4: Ingresos Económicos', text: '¿Demuestra ingresos de al menos el 200% del Salario Mínimo (aprox. 2.646€/mes) o saldo equivalente en cuenta bancaria?', type: 'filter' },
+    { id: 'dn_q_health', x: 600, y: 1100, title: 'Filtro 5: Salud y Penales', text: '¿Carece de antecedentes penales (5 años) y cuenta con seguro médico público o privado (sin copagos) válido en España?', type: 'filter' },
+
+    { id: 'dn_fail_3', x: 1000, y: 950, title: '❌ Requisitos Generales', text: 'No cumple con los ingresos mínimos, la cualificación, antecedentes o seguro médico.', type: 'error' },
+
+    // Resultado Exitoso
+    { id: 'dn_success', x: 600, y: 1250, title: '✅ Elegible: CheckList Documentos', text: '• Pasaporte válido\n• Formulario de Solicitud (UGE)\n• Tasa (038 o 052)\n• Cert. Antecedentes Penales apostillado\n• Seguro Médico Completo\n• Título Univ. o CV + Pruebas de 3 años exp.\n• Contrato laboral/mercantil (teletrabajo)\n• Certificado empresa (1 año actividad)\n• Extractos bancarios / Nóminas (Ingresos)', type: 'result' },
+    ];
+
+    const nomadEdges = [
+    { id: 'e_dn_s_q1', from: 'start_dn', to: 'dn_q1', label: 'Iniciar' },
+
+    { id: 'e_dn_q1_b', from: 'dn_q1', to: 'dn_branch_1', label: 'SÍ' },
+    { id: 'e_dn_q1_f', from: 'dn_q1', to: 'dn_fail_1', label: 'NO' },
+
+    // Ramas
+    { id: 'e_dn_b_emp', from: 'dn_branch_1', to: 'dn_q_emp_1', label: 'Cuenta Ajena (Empleado)' },
+    { id: 'e_dn_b_free', from: 'dn_branch_1', to: 'dn_q_free_1', label: 'Cuenta Propia (Freelance)' },
+
+    // Logica Empleado
+    { id: 'e_dn_emp1_emp2', from: 'dn_q_emp_1', to: 'dn_q_emp_2', label: 'SÍ' },
+    { id: 'e_dn_emp1_f', from: 'dn_q_emp_1', to: 'dn_fail_2', label: 'NO' },
+    { id: 'e_dn_emp2_qual', from: 'dn_q_emp_2', to: 'dn_q_qual', label: 'SÍ' },
+    { id: 'e_dn_emp2_f', from: 'dn_q_emp_2', to: 'dn_fail_2', label: 'NO' },
+
+    // Logica Freelance
+    { id: 'e_dn_free1_free2', from: 'dn_q_free_1', to: 'dn_q_free_2', label: 'SÍ' },
+    { id: 'e_dn_free1_f', from: 'dn_q_free_1', to: 'dn_fail_2', label: 'NO' },
+    { id: 'e_dn_free2_qual', from: 'dn_q_free_2', to: 'dn_q_qual', label: 'SÍ' },
+    { id: 'e_dn_free2_f', from: 'dn_q_free_2', to: 'dn_fail_2', label: 'NO' },
+
+    // Filtros Generales Finales
+    { id: 'e_dn_qual_inc', from: 'dn_q_qual', to: 'dn_q_inc', label: 'SÍ' },
+    { id: 'e_dn_qual_f', from: 'dn_q_qual', to: 'dn_fail_3', label: 'NO' },
+
+    { id: 'e_dn_inc_health', from: 'dn_q_inc', to: 'dn_q_health', label: 'SÍ' },
+    { id: 'e_dn_inc_f', from: 'dn_q_inc', to: 'dn_fail_3', label: 'NO' },
+
+    { id: 'e_dn_health_suc', from: 'dn_q_health', to: 'dn_success', label: 'SÍ' },
+    { id: 'e_dn_health_f', from: 'dn_q_health', to: 'dn_fail_3', label: 'NO' },
+    ];
+
+    // ============================================================================
+    // DATOS DEL ASSESSMENT: TRABAJO (Cuenta Ajena y Cuenta Propia)
+    // ============================================================================
+
+    const workNodes = [
+    { id: 'start_wk', x: 600, y: 50, title: 'INICIO: Visado de Trabajo', text: 'Residencia y Trabajo Inicial\n(Ley Orgánica 4/2000 y RD 557/2011)', type: 'start' },
+
+    // Filtros Generales
+    { id: 'wk_q1', x: 600, y: 200, title: 'Filtro 1: Situación Regular', text: '¿Se encuentra fuera de España (o en España con un estatus legal que permita la modificación)?', type: 'filter' },
+    { id: 'wk_fail_1', x: 1000, y: 200, title: '❌ No Elegible (Trabajo Inicial)', text: 'No puede solicitar un visado de trabajo inicial si se encuentra en situación irregular en España. Debe explorar opciones de Arraigo.', type: 'error' },
+
+    { id: 'wk_q2', x: 600, y: 350, title: 'Filtro 2: Antecedentes', text: '¿Carece de antecedentes penales en España y en sus países de residencia previos (últimos 5 años)?', type: 'filter' },
+    { id: 'wk_fail_2', x: 1000, y: 350, title: '❌ Denegación', text: 'Los antecedentes penales o prohibiciones de entrada impiden la concesión de esta autorización.', type: 'error' },
+
+    // Bifurcación
+    { id: 'wk_branch', x: 600, y: 500, title: 'Tipo de Actividad', text: '¿Bajo qué modalidad pretende trabajar en España?', type: 'branch' },
+
+    // Rama: Cuenta Ajena (Empleado)
+    { id: 'wk_qa_1', x: 250, y: 650, title: 'Cuenta Ajena: Contrato', text: '¿Existe una oferta de empleo formal y un contrato de trabajo firmado (garantizando al menos el SMI)?', type: 'filter' },
+    { id: 'wk_qa_2', x: 250, y: 800, title: 'Situación Nacional de Empleo', text: '¿El puesto está en el Catálogo de Ocupaciones de Difícil Cobertura, O BIEN el empleador tiene certificado del SEPE de insuficiencia de demandantes, O aplica excepción (Art. 40 - ej. nacionalidad peruana/chilena)?', type: 'filter' },
+    { id: 'wk_qa_3', x: 250, y: 950, title: 'Solvencia del Empleador', text: '¿Puede el empleador acreditar medios económicos, materiales y personales suficientes para hacer frente al proyecto y al salario?', type: 'filter' },
+    { id: 'wk_fail_ajena', x: -100, y: 800, title: '❌ No Elegible (Ajena)', text: 'Falta contrato válido, la ocupación no supera el filtro del SEPE, o la empresa no es solvente.', type: 'error' },
+
+    { id: 'wk_succ_ajena', x: 250, y: 1150, title: '✅ Checklist: Cuenta Ajena', text: 'TRÁMITE EMPLEADOR EN ESPAÑA:\n• EX-03 Formulario\n• Contrato Trabajo\n• DNI/CIF Empleador\n• Solvencia Empleador (IRPF/Sociedades)\n• Cert. SEPE (si aplica)\n\nTRÁMITE TRABAJADOR EN CONSULADO:\n• Pasaporte\n• Cert. Penales\n• Cert. Médico\n• Copia de Autorización Concedida', type: 'result' },
+
+    // Rama: Cuenta Propia (Autónomo/Emprendedor)
+    { id: 'wk_qp_1', x: 950, y: 650, title: 'Cuenta Propia: Plan de Negocio', text: '¿Cuenta con un Plan de Empresa/Negocio detallado indicando viabilidad técnica, comercial y financiera, y creación de empleo prevista?', type: 'filter' },
+    { id: 'wk_qp_2', x: 950, y: 800, title: 'Inversión y Medios de Vida', text: '¿Demuestra poseer la inversión de capital necesaria para el negocio, MÁS los medios de vida suficientes para subsistir (min. 100% IPREM) descontando gastos?', type: 'filter' },
+    { id: 'wk_qp_3', x: 950, y: 950, title: 'Cualificación/Licencias', text: '¿Tiene la capacitación, titulación o experiencia requerida para la profesión, y las licencias de apertura/municipales necesarias (o en trámite)?', type: 'filter' },
+    { id: 'wk_fail_propia', x: 1350, y: 800, title: '❌ No Elegible (Propia)', text: 'Plan de negocio inviable, falta de capital de inversión, o carencia de cualificaciones/licencias.', type: 'error' },
+
+    { id: 'wk_succ_propia', x: 950, y: 1150, title: '✅ Checklist: Cuenta Propia', text: '• EX-07 Formulario\n• Pasaporte en vigor\n• Cert. Penales y Médico\n• Plan de Negocio (preferiblemente evaluado por UPTA, ATA, etc.)\n• Acreditación Inversión (Extractos, proformas)\n• Títulos/Cualificaciones\n• Justificantes solicitud licencias', type: 'result' },
+    ];
+
+    const workEdges = [
+    { id: 'e_wk_s_q1', from: 'start_wk', to: 'wk_q1', label: 'Iniciar' },
+
+    // Filtros iniciales
+    { id: 'e_wk_q1_q2', from: 'wk_q1', to: 'wk_q2', label: 'SÍ (Fuera/Legal)' },
+    { id: 'e_wk_q1_f', from: 'wk_q1', to: 'wk_fail_1', label: 'NO (Irregular)' },
+
+    { id: 'e_wk_q2_b', from: 'wk_q2', to: 'wk_branch', label: 'SÍ (Sin penales)' },
+    { id: 'e_wk_q2_f', from: 'wk_q2', to: 'wk_fail_2', label: 'NO' },
+
+    // Bifurcacion
+    { id: 'e_wk_b_a', from: 'wk_branch', to: 'wk_qa_1', label: 'Cuenta Ajena (Empleado)' },
+    { id: 'e_wk_b_p', from: 'wk_branch', to: 'wk_qp_1', label: 'Cuenta Propia (Autónomo)' },
+
+    // Logica Cuenta Ajena
+    { id: 'e_wk_qa1_qa2', from: 'wk_qa_1', to: 'wk_qa_2', label: 'SÍ' },
+    { id: 'e_wk_qa1_f', from: 'wk_qa_1', to: 'wk_fail_ajena', label: 'NO' },
+    { id: 'e_wk_qa2_qa3', from: 'wk_qa_2', to: 'wk_qa_3', label: 'SÍ' },
+    { id: 'e_wk_qa2_f', from: 'wk_qa_2', to: 'wk_fail_ajena', label: 'NO' },
+    { id: 'e_wk_qa3_suc', from: 'wk_qa_3', to: 'wk_succ_ajena', label: 'SÍ' },
+    { id: 'e_wk_qa3_f', from: 'wk_qa_3', to: 'wk_fail_ajena', label: 'NO' },
+
+    // Logica Cuenta Propia
+    { id: 'e_wk_qp1_qp2', from: 'wk_qp_1', to: 'wk_qp_2', label: 'SÍ' },
+    { id: 'e_wk_qp1_f', from: 'wk_qp_1', to: 'wk_fail_propia', label: 'NO' },
+    { id: 'e_wk_qp2_qp3', from: 'wk_qp_2', to: 'wk_qp_3', label: 'SÍ' },
+    { id: 'e_wk_qp2_f', from: 'wk_qp_2', to: 'wk_fail_propia', label: 'NO' },
+    { id: 'e_wk_qp3_suc', from: 'wk_qp_3', to: 'wk_succ_propia', label: 'SÍ' },
+    { id: 'e_wk_qp3_f', from: 'wk_qp_3', to: 'wk_fail_propia', label: 'NO' },
+    ];
+
+    // ============================================================================
+    // DATOS DEL ASSESSMENT: VISADO DE ESTUDIOS
+    // ============================================================================
+
+    const studentNodes = [
+    { id: 'start_st', x: 600, y: 50, title: 'INICIO: Estancia por Estudios', text: 'Estudios, Formación o Investigación\n(Art. 37-42 Ley de Extranjería)', type: 'start' },
+
+    { id: 'st_q1', x: 600, y: 200, title: 'Filtro 1: Ubicación y Plazo', text: '¿Se encuentra fuera de España (aplica en Consulado) O BIEN está en España legalmente y le queda al menos 1 mes de estancia legal para aplicar (Extranjería)?', type: 'filter' },
+    { id: 'st_fail_1', x: 1000, y: 200, title: '❌ No Elegible (Irregular/Plazo)', text: 'No puede aplicar desde España si está en situación irregular o si le quedan menos de 30 días de su visado/estancia de turista.', type: 'error' },
+
+    { id: 'st_q2', x: 600, y: 350, title: 'Filtro 2: Centro Educativo', text: '¿Tiene admisión definitiva en un centro de enseñanza autorizado en España, para un programa a tiempo completo (mín. 20h/sem) que culmine en título o certificado?', type: 'filter' },
+    { id: 'st_fail_2', x: 1000, y: 350, title: '❌ Matrícula Inválida', text: 'El curso debe ser presencial (o semipresencial autorizado), mínimo 20h a la semana y en un centro reconocido.', type: 'error' },
+
+    { id: 'st_q3', x: 600, y: 500, title: 'Filtro 3: Medios Económicos', text: '¿Demuestra fondos para subsistir (100% IPREM mensual, aprox. 600€) multiplicados por los meses del curso, con la matrícula ya pagada y el alojamiento garantizado?', type: 'filter' },
+    { id: 'st_fail_3', x: 1000, y: 500, title: '❌ Fondos Insuficientes', text: 'Debe demostrar tener el dinero en cuenta (propia o de familiares directos) o una beca que cubra el IPREM requerido.', type: 'error' },
+
+    { id: 'st_q4', x: 600, y: 650, title: 'Filtro 4: Seguro, Médico y Penales', text: '¿Tiene seguro médico español completo (sin copagos/carencias)? Y si el curso dura MÁS de 6 meses: ¿Carece de antecedentes penales (5 años) y tiene Certificado Médico?', type: 'filter' },
+    { id: 'st_fail_4', x: 1000, y: 650, title: '❌ Requisitos Generales', text: 'Falta cobertura médica adecuada o los certificados obligatorios para estancias superiores a 180 días.', type: 'error' },
+
+    { id: 'st_succ', x: 600, y: 850, title: '✅ Checklist: Visado/Estancia Estudios', text: '• EX-00 (España) o Formulario Nacional (Consulado)\n• Pasaporte Completo\n• Carta Admisión Centro Educativo\n• Justificante pago de matrícula\n• Extractos bancarios / Beca (Medios Económicos)\n• Póliza Seguro Médico (Sin copagos ni carencias)\n• Tasa (052 o consular)\n\nSI > 6 MESES AÑADIR:\n• Cert. Penales apostillado\n• Cert. Médico (RSI 2005)\n\nSI MENOR DE EDAD AÑADIR:\n• Certificado Nacimiento\n• Autorización notarial de los padres', type: 'result' },
+    ];
+
+    const studentEdges = [
+    { id: 'e_st_s_q1', from: 'start_st', to: 'st_q1', label: 'Iniciar' },
+
+    { id: 'e_st_q1_q2', from: 'st_q1', to: 'st_q2', label: 'SÍ' },
+    { id: 'e_st_q1_f', from: 'st_q1', to: 'st_fail_1', label: 'NO' },
+
+    { id: 'e_st_q2_q3', from: 'st_q2', to: 'st_q3', label: 'SÍ' },
+    { id: 'e_st_q2_f', from: 'st_q2', to: 'st_fail_2', label: 'NO' },
+
+    { id: 'e_st_q3_q4', from: 'st_q3', to: 'st_q4', label: 'SÍ' },
+    { id: 'e_st_q3_f', from: 'st_q3', to: 'st_fail_3', label: 'NO' },
+
+    { id: 'e_st_q4_suc', from: 'st_q4', to: 'st_succ', label: 'SÍ' },
+    { id: 'e_st_q4_f', from: 'st_q4', to: 'st_fail_4', label: 'NO' },
+    ];
+
+    // ============================================================================
+    // DATOS DEL ASSESSMENT: RESIDENCIA NO LUCRATIVA
+    // ============================================================================
+
+    const nonLucrativeNodes = [
+    { id: 'start_nl', x: 600, y: 50, title: 'INICIO: Residencia No Lucrativa', text: 'Residir en España sin ejercer actividad laboral\n(Art. 46-49 Reglamento Extranjería)', type: 'start' },
+
+    { id: 'nl_q1', x: 600, y: 200, title: 'Filtro 1: Ubicación', text: '¿Se encuentra fuera de España (en su país de origen o donde tenga residencia legal comprobable)?', type: 'filter' },
+    { id: 'nl_fail_1', x: 1000, y: 200, title: '❌ Error de Procedimiento', text: 'Este visado inicial NO puede solicitarse estando dentro de España como turista. Debe tramitarse en el Consulado de su demarcación.', type: 'error' },
+
+    { id: 'nl_q2', x: 600, y: 350, title: 'Filtro 2: Intención Laboral', text: '¿Se compromete a no realizar NINGUNA actividad laboral o profesional (incluyendo teletrabajo) durante su residencia en España?', type: 'filter' },
+    { id: 'nl_fail_2', x: 1000, y: 350, title: '❌ Visado Incorrecto', text: 'Si su intención es teletrabajar, debe solicitar la Nómada Digital. Si va a montar un negocio, el Visado por Cuenta Propia.', type: 'error' },
+
+    { id: 'nl_q3', x: 600, y: 500, title: 'Filtro 3: Medios Económicos', text: '¿Dispone de ingresos pasivos, rentas, pensiones o ahorros propios garantizados que superen el 400% del IPREM mensual durante 1 año (aprox. 28.800€/año), más 100% extra por cada familiar?', type: 'filter' },
+    { id: 'nl_fail_3', x: 1000, y: 500, title: '❌ Fondos Insuficientes o Inválidos', text: 'Debe demostrar solvencia sostenida sin depender de un salario actual. Las nóminas de empleo remoto activo no son válidas para esta vía.', type: 'error' },
+
+    { id: 'nl_q4', x: 600, y: 650, title: 'Filtro 4: Salud y Penales', text: '¿Tiene seguro médico español privado integral (sin copagos ni carencias), Certificado Médico (RSI 2005) y carece de antecedentes penales en los últimos 5 años?', type: 'filter' },
+    { id: 'nl_fail_4', x: 1000, y: 650, title: '❌ Denegación Asegurada', text: 'Los seguros de viaje o con franquicias/copagos son automáticamente rechazados por el consulado. Los antecedentes también bloquean el trámite.', type: 'error' },
+
+    { id: 'nl_succ', x: 600, y: 850, title: '✅ Checklist: Visado No Lucrativa', text: '• Formulario EX-01 y Formulario Consular\n• Pasaporte en vigor (mín. 1 año de validez)\n• Certificado Penales Apostillado/Legalizado\n• Cert. Médico (Reglamento Sanitario Int. 2005)\n• Seguro Médico Español (cobertura total y repatriación preferiblemente)\n• Demostración económica (extractos bancarios de 6-12 meses, certificados de pensiones, rentas de alquiler, dividendos)\n• Tasas consulares y Modelo 790 código 052', type: 'result' },
+    ];
+
+    const nonLucrativeEdges = [
+    { id: 'e_nl_s_q1', from: 'start_nl', to: 'nl_q1', label: 'Iniciar' },
+
+    { id: 'e_nl_q1_q2', from: 'nl_q1', to: 'nl_q2', label: 'SÍ' },
+    { id: 'e_nl_q1_f', from: 'nl_q1', to: 'nl_fail_1', label: 'NO (En España)' },
+
+    { id: 'e_nl_q2_q3', from: 'nl_q2', to: 'nl_q3', label: 'SÍ' },
+    { id: 'e_nl_q2_f', from: 'nl_q2', to: 'nl_fail_2', label: 'NO' },
+
+    { id: 'e_nl_q3_q4', from: 'nl_q3', to: 'nl_q4', label: 'SÍ' },
+    { id: 'e_nl_q3_f', from: 'nl_q3', to: 'nl_fail_3', label: 'NO' },
+
+    { id: 'e_nl_q4_suc', from: 'nl_q4', to: 'nl_succ', label: 'SÍ' },
+    { id: 'e_nl_q4_f', from: 'nl_q4', to: 'nl_fail_4', label: 'NO' },
+    ];
+
+    // ============================================================================
+    // DATOS DEL ASSESSMENT: BÚSQUEDA DE EMPLEO
+    // ============================================================================
+
+    const jobSeekerNodes = [
+    { id: 'start_js', x: 600, y: 50, title: 'INICIO: Búsqueda de Empleo', text: 'Permisos para buscar trabajo en España\n(Estudiantes o Hijos/Nietos de Españoles)', type: 'start' },
+
+    { id: 'js_q1', x: 600, y: 200, title: 'Filtro 1: Perfil del Solicitante', text: '¿Pertenece a alguno de estos grupos?\n1. Estudiante en España a punto de graduarse o recién graduado.\n2. Hijo o nieto de español de origen residente en el extranjero.', type: 'filter' },
+    { id: 'js_fail_1', x: 1000, y: 200, title: '❌ No Elegible (Vía Directa)', text: 'Si no es estudiante recién graduado en España ni descendiente de español, no existe un "visado de búsqueda de empleo" genérico. Debe conseguir una oferta de trabajo desde su país.', type: 'error' },
+
+    { id: 'js_branch', x: 600, y: 350, title: 'Bifurcación de Vías', text: 'Seleccione su perfil específico:', type: 'branch' },
+
+    // Ruta Estudiantes (Ley de Emprendedores)
+    { id: 'js_qa_1', x: 250, y: 500, title: 'Filtro: Nivel de Estudios', text: '¿Ha superado los estudios en una Institución de Educación Superior (Nivel mínimo 6: Grado, Máster o Doctorado) en España?', type: 'filter' },
+    { id: 'js_qa_fail_1', x: -100, y: 500, title: '❌ Nivel Insuficiente', text: 'Los cursos de idiomas, certificados de profesionalidad o grados medios/superiores (FP) no dan acceso a este permiso específico. Deben ser estudios universitarios/superiores.', type: 'error' },
+
+    { id: 'js_qa_2', x: 250, y: 650, title: 'Filtro: Medios y Seguro', text: '¿Dispone de seguro médico (sin copagos) y fondos suficientes (100% IPREM, aprox. 600€/mes) para mantenerse durante 12 meses sin trabajar?', type: 'filter' },
+    { id: 'js_qa_fail_2', x: -100, y: 650, title: '❌ Fondos/Seguro Insuficiente', text: 'Es obligatorio demostrar solvencia económica y cobertura sanitaria mientras se busca empleo.', type: 'error' },
+
+    { id: 'js_succ_a', x: 250, y: 850, title: '✅ Checklist: Residencia Búsqueda Empleo (Estudiantes)', text: 'Trámite desde España (dentro de los 60 días previos a caducar NIE o 90 días posteriores):\n• Formulario EX-01\n• Título universitario o certificado de haber superado los estudios\n• Seguro médico sin carencias/copagos\n• Extractos bancarios (Solvencia 100% IPREM x 12 meses)\n• Tasa 052 (Epígrafe 2.1)\n\n*Nota: Dura 12 meses (24m en algunas CCAA). Si encuentra empleo, se modifica a residencia y trabajo.*', type: 'result' },
+
+    // Ruta Descendientes de Españoles
+    { id: 'js_qb_1', x: 950, y: 500, title: 'Filtro: Solicitud Consular', text: '¿Se encuentra en su país de residencia legal y puede demostrar documentalmente su vínculo como hijo o nieto de un español de origen?', type: 'filter' },
+    { id: 'js_qb_fail_1', x: 1350, y: 500, title: '❌ No Elegible', text: 'Debe aplicar obligatoriamente desde el Consulado de España en su demarcación presentando los certificados de nacimiento correspondientes.', type: 'error' },
+
+    { id: 'js_succ_b', x: 950, y: 850, title: '✅ Checklist: Visado Búsqueda Empleo (Descendientes)', text: 'Trámite en Consulado de origen:\n• Formulario Visado Nacional\n• Pasaporte en vigor\n• Certificado de Nacimiento del solicitante (Apostillado)\n• Certificado de Nacimiento del ascendiente (Padre/Madre/Abuelo español de origen)\n• Certificado Antecedentes Penales\n• Certificado Médico\n• Tasa consular\n\n*Nota: Concede un visado de 3 meses para viajar a España. Si encuentra empleo, tramita la residencia desde España sin tener que regresar.*', type: 'result' },
+    ];
+
+    const jobSeekerEdges = [
+    { id: 'e_js_start_q1', from: 'start_js', to: 'js_q1', label: 'Iniciar' },
+
+    { id: 'e_js_q1_b', from: 'js_q1', to: 'js_branch', label: 'SÍ' },
+    { id: 'e_js_q1_f', from: 'js_q1', to: 'js_fail_1', label: 'NO' },
+
+    { id: 'e_js_b_a', from: 'js_branch', to: 'js_qa_1', label: 'Estudiante (Grado/Máster/Doctorado en España)' },
+    { id: 'e_js_b_b', from: 'js_branch', to: 'js_qb_1', label: 'Hijo/Nieto de Español de Origen' },
+
+    // Lógica Estudiante
+    { id: 'e_js_qa1_qa2', from: 'js_qa_1', to: 'js_qa_2', label: 'SÍ' },
+    { id: 'e_js_qa1_f', from: 'js_qa_1', to: 'js_qa_fail_1', label: 'NO' },
+    { id: 'e_js_qa2_suc', from: 'js_qa_2', to: 'js_succ_a', label: 'SÍ' },
+    { id: 'e_js_qa2_f', from: 'js_qa_2', to: 'js_qa_fail_2', label: 'NO' },
+
+    // Lógica Descendientes
+    { id: 'e_js_qb1_suc', from: 'js_qb_1', to: 'js_succ_b', label: 'SÍ' },
+    { id: 'e_js_qb1_f', from: 'js_qb_1', to: 'js_qb_fail_1', label: 'NO' },
+    ];
+
+
+    // Helpers visuales para colorear los bloques según su tipo
+    const getNodeStyles = (type) => {
+    switch(type) {
+    case 'start': return 'border-indigo-400 bg-indigo-50 text-indigo-900 shadow-indigo-100/50';
+    case 'filter': return 'border-amber-400 bg-amber-50 text-amber-900 shadow-amber-100/50';
+    case 'error': return 'border-red-400 bg-red-50 text-red-900 shadow-red-100/50';
+    case 'branch': return 'border-blue-400 bg-blue-50 text-blue-900 shadow-blue-100/50';
+    case 'result': return 'border-emerald-400 bg-emerald-50 text-emerald-900 shadow-emerald-100/50';
+    default: return 'border-gray-400 bg-white text-gray-900 shadow-gray-100/50';
+}
+};
+
+    const getBadgeColor = (type) => {
+    switch(type) {
+    case 'start': return 'bg-indigo-200 text-indigo-800';
+    case 'filter': return 'bg-amber-200 text-amber-800';
+    case 'error': return 'bg-red-200 text-red-800';
+    case 'branch': return 'bg-blue-200 text-blue-800';
+    case 'result': return 'bg-emerald-200 text-emerald-800';
+    default: return 'bg-gray-200 text-gray-800';
+}
+};
+
+    const App = () => {
+    const [currentAssessment, setCurrentAssessment] = useState('regularizacion');
+    const [nodes, setNodes] = useState(regularizacionNodes);
+    const [edges, setEdges] = useState(regularizacionEdges);
+    const [pan, setPan] = useState({ x: 50, y: 50 }); // Offset inicial
+    const [draggingNode, setDraggingNode] = useState(null);
+    const [isPanning, setIsPanning] = useState(false);
+
+    const startPos = useRef({ x: 0, y: 0 });
+    const containerRef = useRef(null);
+
+    // Funciones de interacción con Ratón (Mouse)
+    const handleMouseDown = (e, nodeId) => {
+    if (nodeId) {
+    setDraggingNode(nodeId);
+} else {
+    setIsPanning(true);
+}
+    startPos.current = { x: e.clientX, y: e.clientY };
+};
+
+    const handleMouseMove = (e) => {
+    if (draggingNode) {
+    const dx = e.clientX - startPos.current.x;
+    const dy = e.clientY - startPos.current.y;
+    setNodes(nodes.map(n => n.id === draggingNode ? { ...n, x: n.x + dx, y: n.y + dy } : n));
+    startPos.current = { x: e.clientX, y: e.clientY };
+} else if (isPanning) {
+    const dx = e.clientX - startPos.current.x;
+    const dy = e.clientY - startPos.current.y;
+    setPan({ x: pan.x + dx, y: pan.y + dy });
+    startPos.current = { x: e.clientX, y: e.clientY };
+}
+};
+
+    const handleMouseUp = () => {
+    setDraggingNode(null);
+    setIsPanning(false);
+};
+
+    // Funciones de interacción Táctil (Mobile/Tablets)
+    const handleTouchStart = (e, nodeId) => {
+    const touch = e.touches[0];
+    if (nodeId) {
+    setDraggingNode(nodeId);
+} else {
+    setIsPanning(true);
+}
+    startPos.current = { x: touch.clientX, y: touch.clientY };
+};
+
+    const handleTouchMove = (e) => {
+    if (!draggingNode && !isPanning) return;
+    const touch = e.touches[0];
+
+    if (draggingNode) {
+    const dx = touch.clientX - startPos.current.x;
+    const dy = touch.clientY - startPos.current.y;
+    setNodes(nodes.map(n => n.id === draggingNode ? { ...n, x: n.x + dx, y: n.y + dy } : n));
+    startPos.current = { x: touch.clientX, y: touch.clientY };
+} else if (isPanning) {
+    const dx = touch.clientX - startPos.current.x;
+    const dy = touch.clientY - startPos.current.y;
+    setPan({ x: pan.x + dx, y: pan.y + dy });
+    startPos.current = { x: touch.clientX, y: touch.clientY };
+}
+};
+
+    const switchAssessment = (type) => {
+    setCurrentAssessment(type);
+    if (type === 'regularizacion') {
+    setNodes(regularizacionNodes);
+    setEdges(regularizacionEdges);
+    setPan({ x: 50, y: 50 });
+} else if (type === 'nomad') {
+    setNodes(nomadNodes);
+    setEdges(nomadEdges);
+    setPan({ x: 50, y: 50 });
+} else if (type === 'work') {
+    setNodes(workNodes);
+    setEdges(workEdges);
+    setPan({ x: 50, y: 50 });
+} else if (type === 'student') {
+    setNodes(studentNodes);
+    setEdges(studentEdges);
+    setPan({ x: 50, y: 50 });
+} else if (type === 'non_lucrative') {
+    setNodes(nonLucrativeNodes);
+    setEdges(nonLucrativeEdges);
+    setPan({ x: 50, y: 50 });
+} else if (type === 'job_seeker') {
+    setNodes(jobSeekerNodes);
+    setEdges(jobSeekerEdges);
+    setPan({ x: 50, y: 50 });
+}
+};
+
+    const resetView = () => {
+    setPan({ x: 50, y: 50 });
+    // No reseteamos los nodos a default para no perder los movimientos del usuario durante su sesion
+};
+
+    return (
+    <div className="w-screen h-screen flex flex-col bg-white select-none">
+{/* Barra de Herramientas Superior */}
+    <div className="flex-none min-h-16 bg-white border-b border-gray-200 shadow-sm flex items-center justify-between px-6 z-50 py-2">
+        <div>
+            <h1 className="text-lg font-bold text-gray-800">Visualizador Assessment</h1>
+            {}
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+                <button
+                    onClick={() => switchAssessment('regularizacion')}
+                    className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${currentAssessment === 'regularizacion' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    Reg. Extraordinaria 2026
+                </button>
+                <button
+                    onClick={() => switchAssessment('nomad')}
+                    className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${currentAssessment === 'nomad' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    Nómada Digital
+                </button>
+                <button
+                    onClick={() => switchAssessment('work')}
+                    className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${currentAssessment === 'work' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    Trabajo
+                </button>
+                <button
+                    onClick={() => switchAssessment('student')}
+                    className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${currentAssessment === 'student' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    Visado Estudios
+                </button>
+                <button
+                    onClick={() => switchAssessment('non_lucrative')}
+                    className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${currentAssessment === 'non_lucrative' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    No Lucrativa
+                </button>
+                <button
+                    onClick={() => switchAssessment('job_seeker')}
+                    className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${currentAssessment === 'job_seeker' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                    Búsqueda Empleo
+                </button>
+            </div>
+        </div>
+        <div className="flex items-center space-x-4 ml-4">
+            <button
+                onClick={resetView}
+                className="hidden lg:inline-block text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors shadow-sm"
+            >
+                Restaurar Vista
+            </button>
+        </div>
+    </div>
+
+    {/* Espacio de Trabajo (Canvas Pizarra) */}
+    <div
+        ref={containerRef}
+        onMouseDown={(e) => handleMouseDown(e, null)}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={(e) => handleTouchStart(e, null)}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleMouseUp}
+        onTouchCancel={handleMouseUp}
+        className={`flex-1 relative miro-bg overflow-hidden ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+    >
+        {/* Contenedor desplazable mediante el estado 'pan' */}
+        <div
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
+            className="absolute top-0 left-0 w-full h-full origin-top-left"
+        >
+
+            {/* Capa SVG para las Líneas (Edges) */}
+            <svg className="absolute top-0 left-0 w-[5000px] h-[5000px] pointer-events-none z-0 overflow-visible">
+                {edges.map(edge => {
+                    const sourceNode = nodes.find(n => n.id === edge.from);
+                    const targetNode = nodes.find(n => n.id === edge.to);
+
+                    if (!sourceNode || !targetNode) return null;
+
+                    // Calculamos un centro aproximado para los bloques (ancho: 288px / alto aprox: 100px)
+                    const x1 = sourceNode.x + 144;
+                    const y1 = sourceNode.y + 60;
+                    const x2 = targetNode.x + 144;
+                    const y2 = targetNode.y + 60;
+
+                    // Dibujamos una curva Bezier suave (S-curve) entre los nodos
+                    const path = `M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`;
+
+                    // Punto medio para la etiqueta (label)
+                    const midX = (x1 + x2) / 2;
+                    const midY = (y1 + y2) / 2;
+
+                    return (
+                        <g key={edge.id}>
+                            <path
+                                d={path}
+                                fill="none"
+                                stroke="#94a3b8"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                            />
+                            {edge.label && (
+                                // foreignObject permite renderizar HTML dentro del SVG
+                                <foreignObject x={midX - 100} y={midY - 14} width="200" height="28" className="overflow-visible">
+                                    <div className="flex items-center justify-center w-full h-full">
+                                                        <span className="bg-white border border-gray-200 text-gray-700 px-3 py-1 text-xs font-bold rounded-full shadow-sm">
+                                                            {edge.label}
+                                                        </span>
+                                    </div>
+                                </foreignObject>
+                            )}
+                        </g>
+                    );
+                })}
+            </svg>
+
+            {/* Capa DIV para las Tarjetas (Nodes) */}
+            {nodes.map(node => {
+                const styles = getNodeStyles(node.type);
+                const badgeStyle = getBadgeColor(node.type);
+                const isDraggingThis = draggingNode === node.id;
+
+                return (
+                    <div
+                        key={node.id}
+                        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, node.id); }}
+                        onTouchStart={(e) => { e.stopPropagation(); handleTouchStart(e, node.id); }}
+                        style={{ left: node.x, top: node.y }}
+                        className={`absolute z-10 w-72 rounded-xl border-2 p-4 bg-opacity-95 backdrop-blur-sm node-card cursor-pointer shadow-lg
+                                                    ${styles} ${isDraggingThis ? 'scale-105 z-20 shadow-xl opacity-90' : ''}`}
+                    >
+                        <div className="flex justify-between items-center mb-3 border-b border-inherit pb-2">
+                            <h3 className="font-bold text-sm tracking-tight leading-tight">{node.title}</h3>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${badgeStyle}`}>
+                                                {node.type}
+                                            </span>
+                        </div>
+                        <div className="text-sm opacity-90 whitespace-pre-wrap leading-relaxed font-medium">
+                            {node.text}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+</div>
+);
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
