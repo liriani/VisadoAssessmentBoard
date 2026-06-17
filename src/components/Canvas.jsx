@@ -6,6 +6,7 @@ import ToolsPanel from './ToolsPanel';
 const Canvas = ({
   containerRef,
   pan,
+  scale,
   nodes,
   edges,
   draggingNode,
@@ -15,6 +16,7 @@ const Canvas = ({
   handleMouseUp,
   handleTouchStart,
   handleTouchMove,
+  handleWheel,
   updateNode,
   simulateEdit,
   setNodes,
@@ -23,8 +25,11 @@ const Canvas = ({
   addPostIt,
   addQuestionsCard,
   resetView,
+  zoomIn,
+  zoomOut,
   currentAssessment
 }) => {
+  const zoomPct = Math.round((scale ?? 1) * 100);
   return (
     <div
       ref={containerRef}
@@ -36,11 +41,12 @@ const Canvas = ({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleMouseUp}
       onTouchCancel={handleMouseUp}
+      onWheel={handleWheel}
       className={`w-full h-full relative miro-bg overflow-hidden ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
     >
-      {/* Pannable layer */}
+      {/* Pannable + zoomable layer */}
       <div
-        style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}
         className="absolute top-0 left-0 w-full h-full origin-top-left"
       >
         {/* SVG edges */}
@@ -121,12 +127,19 @@ const Canvas = ({
       {/* Canvas hint badge */}
       <div className="canvas-hint">{t.hint}</div>
 
+      {/* Zoom level badge */}
+      <div className="absolute bottom-4 right-4 z-40 bg-white border border-gray-200 rounded-lg shadow px-3 py-1 text-xs font-semibold text-gray-500 select-none pointer-events-none">
+        {zoomPct}%
+      </div>
+
       {/* Floating tools panel */}
       <ToolsPanel
         lang={lang}
         addPostIt={addPostIt}
         addQuestionsCard={addQuestionsCard}
         resetView={resetView}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
         t={t}
       />
     </div>

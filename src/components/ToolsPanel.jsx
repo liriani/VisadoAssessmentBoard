@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ToolsPanel = ({ lang, addPostIt, addQuestionsCard, resetView, t }) => {
+const ToolsPanel = ({ lang, addPostIt, addQuestionsCard, resetView, zoomIn, zoomOut, t }) => {
   return (
     <div
       className="absolute left-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2"
@@ -38,6 +38,33 @@ const ToolsPanel = ({ lang, addPostIt, addQuestionsCard, resetView, t }) => {
           <span className="text-lg">🏠</span>
           <span className="text-[9px] font-semibold text-gray-600">
             {t.view}
+          </span>
+        </button>
+
+        {/* Divider */}
+        <div className="border-t border-gray-100 my-0.5" />
+
+        {/* Zoom In */}
+        <button
+          onClick={zoomIn}
+          className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+          title={t.zoomIn}
+        >
+          <span className="text-lg leading-none font-bold text-blue-600">＋</span>
+          <span className="text-[9px] font-semibold text-blue-700">
+            {t.zoomIn}
+          </span>
+        </button>
+
+        {/* Zoom Out */}
+        <button
+          onClick={zoomOut}
+          className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+          title={t.zoomOut}
+        >
+          <span className="text-lg leading-none font-bold text-blue-600">－</span>
+          <span className="text-[9px] font-semibold text-blue-700">
+            {t.zoomOut}
           </span>
         </button>
       </div>
