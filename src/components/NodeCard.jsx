@@ -36,6 +36,8 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
   const editableRef = useRef(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleVal, setTitleVal] = useState(node.title);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(node.text);
 
   // Sync contentEditable content when node.text changes externally
   useEffect(() => {
@@ -76,10 +78,10 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
       title={!isComment && !isCustomBoard ? (lang === 'es' ? 'Doble clic para registrar edición' : 'Double-click to log edit') : ''}
     >
       <div className="flex justify-between items-center mb-2 border-b border-inherit pb-2 gap-1">
-        {/* Title — editable on custom boards */}
-        {isCustomBoard && !isComment && editingTitle ? (
+        {/* Title — editable on custom boards or when isEditing */}
+        {(isCustomBoard && !isComment && editingTitle) || (!isComment && isEditing) ? (
           <input
-            autoFocus
+            autoFocus={isCustomBoard && editingTitle}
             value={titleVal}
             onChange={e => setTitleVal(e.target.value)}
             onBlur={() => { onUpdate({ title: titleVal }); setEditingTitle(false); }}
@@ -97,6 +99,19 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded flex-none ${badgeStyle}`}>
           {node.type}
         </span>
+        {/* Edit button — shown on preset board cards (non-custom, non-comment) */}
+        {!isCustomBoard && !isComment && (
+          <button
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); if (isEditing) { onUpdate({ title: titleVal, text: editText }); } setIsEditing(!isEditing); }}
+            className={`flex-none text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors ml-1 ${
+              isEditing
+                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                : 'bg-white/70 text-gray-500 border-gray-300 hover:bg-gray-100'
+            }`}
+            title={isEditing ? (lang === 'es' ? 'Guardar' : 'Save') : (lang === 'es' ? 'Editar' : 'Edit')}
+          >{isEditing ? '✓' : '✏️'}</button>
+        )}
       </div>
 
       {isComment ? (
@@ -122,6 +137,27 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
           onBlur={e => onUpdate({ text: e.currentTarget.innerText })}
           dangerouslySetInnerHTML={{ __html: node.text }}
         />
+      ) : isEditing ? (
+        /* Inline edit mode for preset board cards */
+        <div onMouseDown={e => e.stopPropagation()}>
+          <textarea
+            autoFocus
+            value={editText}
+            onChange={e => setEditText(e.target.value)}
+            rows={4}
+            className="w-full text-sm bg-white/80 border border-current rounded-lg px-2 py-1.5 outline-none resize-none leading-relaxed font-medium opacity-90"
+          />
+          <div className="flex gap-1.5 mt-1.5 justify-end">
+            <button
+              onClick={e => { e.stopPropagation(); setEditText(node.text); setTitleVal(node.title); setIsEditing(false); }}
+              className="text-[10px] font-bold px-2 py-0.5 rounded border border-gray-300 bg-white/70 text-gray-500 hover:bg-gray-100"
+            >{lang === 'es' ? 'Cancelar' : 'Cancel'}</button>
+            <button
+              onClick={e => { e.stopPropagation(); onUpdate({ title: titleVal, text: editText }); setIsEditing(false); }}
+              className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-600 text-white"
+            >{lang === 'es' ? 'Guardar' : 'Save'}</button>
+          </div>
+        </div>
       ) : (
         <div className="text-sm opacity-90 whitespace-pre-wrap leading-relaxed font-medium">
           {node.text}
