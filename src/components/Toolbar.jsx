@@ -34,7 +34,7 @@ const Toolbar = ({
 
         {/* Left: title + mobile hamburger */}
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className="text-base sm:text-lg font-bold text-gray-800 whitespace-nowrap">{t.appTitle}</h1>
+          <h1 className="text-sm sm:text-lg font-bold text-gray-800 truncate max-w-[140px] sm:max-w-none">{t.appTitle}</h1>
           <button
             onClick={() => setShowMobileMenu(m => !m)}
             className="sm:hidden ml-1 p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600"
@@ -125,13 +125,15 @@ const Toolbar = ({
         <div className="flex items-center gap-2 flex-none">
           <button
             onClick={resetView}
-            className="text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap"
+            className="text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 sm:px-3 py-1.5 rounded-lg transition-colors shadow-sm whitespace-nowrap"
+            title={t.resetView}
           >
-            {t.resetView}
+            <span className="hidden sm:inline">{t.resetView}</span>
+            <span className="sm:hidden">⌖</span>
           </button>
           <button
             onClick={toggleLang}
-            className="text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+            className="text-xs font-bold text-indigo-700 bg-indigo-100 hover:bg-indigo-200 px-2 sm:px-3 py-1.5 rounded-lg transition-colors shadow-sm"
             title={lang === 'es' ? 'Switch to English' : 'Cambiar a Español'}
           >
             {t.langToggle}
