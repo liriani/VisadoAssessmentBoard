@@ -141,25 +141,87 @@ const Toolbar = ({
 
       {/* Mobile dropdown menu */}
       {showMobileMenu && (
-        <div className="sm:hidden border-t border-gray-100 px-3 py-2 flex flex-wrap gap-2 bg-white">
-          {assessmentKeys.map(key => (
-            <button
-              key={key}
-              onClick={() => switchAssessment(key)}
-              className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${!activeCustomBoard && currentAssessment === key ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-            >
-              {t.tabs[key]}
-            </button>
-          ))}
-          {customBoards.map(board => (
-            <button
-              key={board.id}
-              onClick={() => switchToCustomBoard(board.id)}
-              className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${activeCustomBoard === board.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-            >
-              ✏️ {board.name}
-            </button>
-          ))}
+        <div className="sm:hidden border-t border-gray-100 bg-white shadow-md">
+          {/* Preset tabs */}
+          <div className="px-3 pt-2 pb-1">
+            <p className="text-[10px] font-bold uppercase text-gray-400 mb-1.5 tracking-wide">{t.visaPaths}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {assessmentKeys.map(key => (
+                <button
+                  key={key}
+                  onClick={() => { switchAssessment(key); setShowMobileMenu(false); }}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${!activeCustomBoard && currentAssessment === key ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  {t.tabs[key]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom boards */}
+          {customBoards.length > 0 && (
+            <div className="px-3 pt-1 pb-1 border-t border-gray-100">
+              <p className="text-[10px] font-bold uppercase text-gray-400 mb-1.5 tracking-wide">{t.myBoards}</p>
+              <div className="flex flex-col gap-1">
+                {customBoards.map(board => (
+                  <div key={board.id} className="flex items-center gap-1">
+                    {renamingId === board.id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onBlur={() => commitRename(board.id)}
+                        onKeyDown={e => { if (e.key === 'Enter') commitRename(board.id); if (e.key === 'Escape') setRenamingId(null); }}
+                        className="flex-1 text-xs font-medium px-2 py-1.5 rounded-lg border border-emerald-400 outline-none"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => { switchToCustomBoard(board.id); setShowMobileMenu(false); }}
+                        className={`flex-1 text-left text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${activeCustomBoard === board.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        ✏️ {board.name}
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => startRename(board, e)}
+                      className="text-sm text-gray-400 hover:text-indigo-500 px-1.5 py-1.5"
+                      title={t.renameBoard}
+                    >✎</button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (window.confirm(t.deleteBoardConfirm)) deleteCustomBoard(board.id); }}
+                      className="text-sm text-gray-400 hover:text-red-500 px-1.5 py-1.5"
+                      title={t.deleteBoard}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New board input */}
+          <div className="px-3 pt-1 pb-2 border-t border-gray-100">
+            {showNewBoard ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={newBoardName}
+                  onChange={e => setNewBoardName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { handleCreate(); } if (e.key === 'Escape') setShowNewBoard(false); }}
+                  placeholder={t.newBoardPlaceholder}
+                  className="flex-1 text-xs px-2 py-1.5 rounded-lg border border-emerald-400 outline-none"
+                />
+                <button onClick={handleCreate} className="text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-lg">✓</button>
+                <button onClick={() => setShowNewBoard(false)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewBoard(true)}
+                className="w-full flex items-center justify-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <span className="text-base leading-none">＋</span> {t.newBoard}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
