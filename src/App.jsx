@@ -165,9 +165,12 @@ function App() {
   const toggleLang = () => {
     const newLang = lang === 'es' ? 'en' : 'es';
     setLang(newLang);
-    const data = ASSESSMENTS[newLang][currentAssessment];
-    setNodes(data.nodes);
-    setEdges(data.edges);
+    // Only reload preset board nodes; custom boards are language-agnostic
+    if (!activeCustomBoard) {
+      const data = ASSESSMENTS[newLang][currentAssessment];
+      setNodes(data.nodes);
+      setEdges(data.edges);
+    }
   };
 
   const resetView = () => {

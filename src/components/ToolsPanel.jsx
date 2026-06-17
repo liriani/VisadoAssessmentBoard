@@ -56,7 +56,7 @@ const ToolsPanel = ({ lang, addPostIt, addQuestionsCard, resetView, zoomIn, zoom
             <button
               onClick={addPostIt}
               className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 transition-colors"
-              title={lang === 'es' ? 'Añadir nota Post-it' : 'Add Post-it note'}
+              title={t.addPostIt}
             >
               <span className="text-lg">📝</span>
               <span className="text-[9px] font-semibold text-yellow-800">{t.note}</span>
@@ -68,7 +68,7 @@ const ToolsPanel = ({ lang, addPostIt, addQuestionsCard, resetView, zoomIn, zoom
             <button
               onClick={addPostIt}
               className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 transition-colors"
-              title={lang === 'es' ? 'Añadir nota Post-it' : 'Add Post-it note'}
+              title={t.addPostIt}
             >
               <span className="text-lg">📝</span>
               <span className="text-[9px] font-semibold text-yellow-800">{t.note}</span>
@@ -76,7 +76,7 @@ const ToolsPanel = ({ lang, addPostIt, addQuestionsCard, resetView, zoomIn, zoom
             <button
               onClick={addQuestionsCard}
               className="flex flex-col items-center gap-0.5 p-2 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors"
-              title={lang === 'es' ? 'Añadir tarjeta de preguntas' : 'Add assessment questions card'}
+              title={t.addQuestionsCard}
             >
               <span className="text-lg">❓</span>
               <span className="text-[9px] font-semibold text-purple-800">{t.questions}</span>

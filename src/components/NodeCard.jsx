@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { UI_STRINGS } from '../constants/uiStrings';
 
 const getNodeStyles = (type) => {
   switch(type) {
@@ -24,15 +25,14 @@ const getBadgeColor = (type) => {
   }
 };
 
-const PLACEHOLDER_ES = 'Escribe tu comentario aquí...';
-const PLACEHOLDER_EN = 'Write your comment here...';
 
 const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDelete, onUpdate, isDraggingThis, isCustomBoard, connectMode, isConnectSource }) => {
+  const t = UI_STRINGS[lang];
   const isComment = node.type === 'comment';
   const styles = getNodeStyles(node.type);
   const badgeStyle = getBadgeColor(node.type);
-  const placeholder = lang === 'es' ? PLACEHOLDER_ES : PLACEHOLDER_EN;
-  const isPlaceholder = isComment && (node.text === PLACEHOLDER_ES || node.text === PLACEHOLDER_EN);
+  const placeholder = t.commentPlaceholder;
+  const isPlaceholder = isComment && (node.text === UI_STRINGS.es.commentPlaceholder || node.text === UI_STRINGS.en.commentPlaceholder);
   const editableRef = useRef(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleVal, setTitleVal] = useState(node.title);
@@ -45,6 +45,15 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
       editableRef.current.innerText = isPlaceholder ? '' : node.text;
     }
   }, [node.text]);
+
+  // Sync edit buffers when node data changes externally (e.g. language switch)
+  useEffect(() => {
+    if (!isEditing) setEditText(node.text);
+  }, [node.text]);
+
+  useEffect(() => {
+    if (!isEditing && !editingTitle) setTitleVal(node.title);
+  }, [node.title]);
 
   const handleFocus = () => {
     if (isPlaceholder && editableRef.current) {
@@ -75,7 +84,7 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
                   ${isComment ? 'w-52 rotate-1' : 'w-72'}
                   ${connectMode ? 'cursor-crosshair' : 'cursor-pointer'}
                   ${styles} ${isDraggingThis ? 'scale-105 z-20 shadow-xl opacity-90' : ''} ${connectRing}`}
-      title={!isComment && !isCustomBoard ? (lang === 'es' ? 'Doble clic para registrar edición' : 'Double-click to log edit') : ''}
+      title={!isComment && !isCustomBoard ? t.doubleClickToEdit : ''}
     >
       <div className="flex justify-between items-center mb-2 border-b border-inherit pb-2 gap-1">
         {/* Title — editable on custom boards or when isEditing */}
@@ -93,7 +102,7 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
           <h3
             className="font-bold text-sm tracking-tight leading-tight flex-1 min-w-0 truncate"
             onDoubleClick={isCustomBoard && !isComment ? (e) => { e.stopPropagation(); setEditingTitle(true); } : undefined}
-            title={isCustomBoard && !isComment ? (lang === 'es' ? 'Doble clic para editar título' : 'Double-click to edit title') : node.title}
+            title={isCustomBoard && !isComment ? t.doubleClickToEditTitle : node.title}
           >{node.title}</h3>
         )}
         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded flex-none ${badgeStyle}`}>
@@ -109,7 +118,7 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
                 ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
                 : 'bg-white/70 text-gray-500 border-gray-300 hover:bg-gray-100'
             }`}
-            title={isEditing ? (lang === 'es' ? 'Guardar' : 'Save') : (lang === 'es' ? 'Editar' : 'Edit')}
+            title={isEditing ? t.save : t.edit}
           >{isEditing ? '✓' : '✏️'}</button>
         )}
       </div>
@@ -151,11 +160,11 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
             <button
               onClick={e => { e.stopPropagation(); setEditText(node.text); setTitleVal(node.title); setIsEditing(false); }}
               className="text-[10px] font-bold px-2 py-0.5 rounded border border-gray-300 bg-white/70 text-gray-500 hover:bg-gray-100"
-            >{lang === 'es' ? 'Cancelar' : 'Cancel'}</button>
+            >{t.cancel}</button>
             <button
               onClick={e => { e.stopPropagation(); onUpdate({ title: titleVal, text: editText }); setIsEditing(false); }}
               className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500 hover:bg-emerald-600 text-white"
-            >{lang === 'es' ? 'Guardar' : 'Save'}</button>
+            >{t.save}</button>
           </div>
         </div>
       ) : (
@@ -170,7 +179,7 @@ const NodeCard = ({ node, lang, onMouseDown, onTouchStart, onDoubleClick, onDele
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
           className={`absolute top-1 right-1 text-xs font-bold px-1 ${isComment ? 'text-yellow-600 hover:text-red-500' : 'text-gray-400 hover:text-red-500'}`}
-          title={lang === 'es' ? 'Eliminar' : 'Delete'}
+          title={t.delete}
         >✕</button>
       )}
     </div>

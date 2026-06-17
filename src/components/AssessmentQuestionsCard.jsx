@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
+import { UI_STRINGS } from '../constants/uiStrings';
 
 const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDelete, onUpdate, isDraggingThis, currentAssessment }) => {
+  const t = UI_STRINGS[lang];
   const [inputText, setInputText] = useState('');
   const [questionType, setQuestionType] = useState('yes_no');
   const [expandedQ, setExpandedQ] = useState(null);
@@ -13,17 +15,12 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
     onUpdate({ questions: newQs });
   };
 
-  const questionTypeLabel = (t) => {
-    if (t === 'yes_no') return lang === 'es' ? 'Sí/No' : 'Yes/No';
-    if (t === 'multiple') return lang === 'es' ? 'Múltiple' : 'Multiple';
-    if (t === 'single') return lang === 'es' ? 'Única' : 'Single';
-    return t;
-  };
+  const questionTypeLabel = (type) => t.questionTypes[type] || type;
 
-  const questionTypeBadge = (t) => {
-    if (t === 'yes_no') return 'bg-indigo-100 text-indigo-700';
-    if (t === 'multiple') return 'bg-blue-100 text-blue-700';
-    if (t === 'single') return 'bg-emerald-100 text-emerald-700';
+  const questionTypeBadge = (type) => {
+    if (type === 'yes_no') return 'bg-indigo-100 text-indigo-700';
+    if (type === 'multiple') return 'bg-blue-100 text-blue-700';
+    if (type === 'single') return 'bg-emerald-100 text-emerald-700';
     return 'bg-gray-100 text-gray-700';
   };
 
@@ -97,7 +94,7 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
           if (parsed.title) updates.title = parsed.title;
           onUpdate(updates);
         }
-      } catch(err) { alert(lang === 'es' ? 'JSON inválido' : 'Invalid JSON'); }
+      } catch(err) { alert(t.invalidJSON); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -125,25 +122,25 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
           {node.title}
         </h3>
         <div className="flex items-center gap-1 ml-2 flex-none">
-          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-purple-200 text-purple-800">questions</span>
+          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-purple-200 text-purple-800">{t.questions}</span>
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); exportJSON(); }}
             className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300"
-            title={lang === 'es' ? 'Exportar JSON' : 'Export JSON'}
+            title={t.exportJSON}
           >↓ JSON</button>
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); importRef.current && importRef.current.click(); }}
             className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300"
-            title={lang === 'es' ? 'Importar JSON' : 'Import JSON'}
+            title={t.importJSON}
           >↑ JSON</button>
           <input ref={importRef} type="file" accept=".json" className="hidden" onChange={importJSON} />
           <button
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
             className="text-purple-400 hover:text-red-500 text-xs font-bold px-1"
-            title={lang === 'es' ? 'Eliminar tarjeta' : 'Delete card'}
+            title={t.deleteCard}
           >✕</button>
         </div>
       </div>
@@ -155,7 +152,7 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
       >
         {questions.length === 0 && (
           <p className="text-xs text-purple-400 italic text-center py-3">
-            {lang === 'es' ? 'Sin preguntas aún. Añade una abajo.' : 'No questions yet. Add one below.'}
+            {t.noQuestionsYet}
           </p>
         )}
         {questions.map((q, idx) => (
@@ -172,7 +169,7 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
                   <button
                     onClick={(e) => { e.stopPropagation(); setExpandedQ(expandedQ === q.id ? null : q.id); setNewOptionText(''); }}
                     className="text-[10px] text-purple-500 hover:text-purple-700 font-bold px-1"
-                    title={lang === 'es' ? 'Ver/editar opciones' : 'View/edit options'}
+                    title={t.viewEditOptions}
                   >{expandedQ === q.id ? '▲' : '▼'}</button>
                 )}
                 <button
@@ -186,7 +183,7 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
               <div className="border-t border-purple-100 bg-purple-50/60 px-2 py-1.5 flex flex-col gap-1">
                 {(q.options || []).length === 0 && (
                   <p className="text-[10px] text-purple-400 italic">
-                    {lang === 'es' ? 'Sin opciones aún.' : 'No options yet.'}
+                    {t.noOptionsYet}
                   </p>
                 )}
                 {(q.options || []).map(opt => (
@@ -199,11 +196,9 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
                           ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
                           : 'bg-red-100 text-red-600 border-red-300'
                       }`}
-                      title={lang === 'es' ? 'Clic para cambiar' : 'Click to toggle'}
+                      title={t.clickToToggle}
                     >
-                      {opt.qualifies
-                        ? (lang === 'es' ? '✓ Califica' : '✓ Qualifies')
-                        : (lang === 'es' ? '✗ No califica' : '✗ Disqualifies')}
+                      {opt.qualifies ? t.qualifies : t.disqualifies}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteOption(q.id, opt.id); }}
@@ -218,7 +213,7 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
                     value={newOptionText}
                     onChange={(e) => setNewOptionText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOption(q.id); } }}
-                    placeholder={lang === 'es' ? 'Nueva opción...' : 'New option...'}
+                    placeholder={t.newOption}
                     className="flex-1 text-[10px] border border-purple-200 rounded px-1.5 py-1 bg-white focus:outline-none focus:border-purple-400"
                   />
                   <button
@@ -239,17 +234,17 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
       >
         {/* Type selector */}
         <div className="flex gap-1 mb-1.5">
-          {['yes_no', 'multiple', 'single'].map(t => (
+          {['yes_no', 'multiple', 'single'].map(type => (
             <button
-              key={t}
-              onClick={(e) => { e.stopPropagation(); setQuestionType(t); }}
+              key={type}
+              onClick={(e) => { e.stopPropagation(); setQuestionType(type); }}
               className={`flex-1 text-[9px] font-bold py-1 rounded border transition-colors ${
-                questionType === t
+                questionType === type
                   ? 'bg-purple-600 text-white border-purple-600'
                   : 'bg-white text-purple-600 border-purple-300 hover:bg-purple-100'
               }`}
             >
-              {questionTypeLabel(t)}
+              {questionTypeLabel(type)}
             </button>
           ))}
         </div>
@@ -260,14 +255,14 @@ const AssessmentQuestionsCard = ({ node, lang, onMouseDown, onTouchStart, onDele
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addQuestion(); } }}
-            placeholder={lang === 'es' ? 'Escribe una pregunta...' : 'Type a question...'}
+            placeholder={t.typeQuestion}
             className="flex-1 text-xs border border-purple-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:border-purple-500 placeholder-purple-300"
           />
           <button
             onClick={(e) => { e.stopPropagation(); addQuestion(); }}
             className="flex-none text-xs font-bold px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors"
           >
-            {lang === 'es' ? 'Añadir' : 'Add'}
+            {t.addQuestion}
           </button>
         </div>
       </div>
