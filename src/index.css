@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  overflow: hidden; /* Prevent native scroll to use custom panning */
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa;
+}
+
+/* Custom Miro-like background pattern */
+.miro-bg {
+  background-color: #f4f4f5;
+  background-image: radial-gradient(#d4d4d8 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+}
+
+.node-card {
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.node-card:active {
+  transform: scale(0.98);
+}
+
+.canvas-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.85);
+  border: 1px solid #e4e4e7;
+  border-radius: 9999px;
+  padding: 6px 16px;
+  font-size: 11px;
+  color: #71717a;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  z-index: 30;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
