@@ -16,11 +16,18 @@ function App() {
   const [isPanning, setIsPanning] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
+  // Custom boards
+  const [customBoards, setCustomBoards] = useState([]);
+  const [activeCustomBoard, setActiveCustomBoard] = useState(null); // null = showing a preset assessment
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectSource, setConnectSource] = useState(null);
+  const [pendingEdge, setPendingEdge] = useState(null); // { from, to } waiting for inline label
+
   const startPos = useRef({ x: 0, y: 0 });
   const containerRef = useRef(null);
 
-  const MIN_SCALE = 0.2;
-  const MAX_SCALE = 3;
+  const MIN_SCALE = 0.3;
+  const MAX_SCALE = 2.5;
   const ZOOM_STEP = 0.15;
   const t = UI_STRINGS[lang];
 
@@ -137,6 +144,11 @@ function App() {
 
   // Switch assessment (preserves language)
   const switchAssessment = (type, overrideLang) => {
+    // Save current custom board before leaving
+    if (activeCustomBoard) {
+      setCustomBoards(prev => prev.map(b => b.id === activeCustomBoard ? { ...b, nodes, edges } : b));
+      setActiveCustomBoard(null);
+    }
     const activeLang = overrideLang || lang;
     setCurrentAssessment(type);
     const data = ASSESSMENTS[activeLang][type];
@@ -144,6 +156,8 @@ function App() {
     setEdges(data.edges);
     setPan({ x: 50, y: 50 });
     setScale(1);
+    setConnectMode(false);
+    setConnectSource(null);
     setShowMobileMenu(false);
   };
 
@@ -162,7 +176,19 @@ function App() {
   };
 
   const updateNode = (nodeId, updates) => {
-    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, ...updates } : n));
+    setNodes(prev => {
+      const updated = prev.map(n => n.id === nodeId ? { ...n, ...updates } : n);
+      if (activeCustomBoard) saveCurrentCustomBoard(updated, edges);
+      return updated;
+    });
+  };
+
+  const deleteCustomNode = (nodeId) => {
+    const updatedNodes = nodes.filter(n => n.id !== nodeId);
+    const updatedEdges = edges.filter(e => e.from !== nodeId && e.to !== nodeId);
+    setNodes(updatedNodes);
+    setEdges(updatedEdges);
+    saveCurrentCustomBoard(updatedNodes, updatedEdges);
   };
 
   // Add an Assessment Questions node to the canvas
@@ -210,6 +236,109 @@ function App() {
     setNodes(prev => [...prev, auditNode]);
   };
 
+  // ── Custom board helpers ──────────────────────────────────────────────────
+
+  const createCustomBoard = (name) => {
+    const id = 'board_' + Date.now();
+    const board = { id, name, nodes: [], edges: [] };
+    setCustomBoards(prev => [...prev, board]);
+    // Switch to the new board
+    setActiveCustomBoard(id);
+    setNodes([]);
+    setEdges([]);
+    setPan({ x: 50, y: 50 });
+    setScale(1);
+    setConnectMode(false);
+    setConnectSource(null);
+  };
+
+  const deleteCustomBoard = (boardId) => {
+    setCustomBoards(prev => prev.filter(b => b.id !== boardId));
+    if (activeCustomBoard === boardId) {
+      // Fall back to first preset
+      setActiveCustomBoard(null);
+      setCurrentAssessment('regularizacion');
+      const data = ASSESSMENTS[lang]['regularizacion'];
+      setNodes(data.nodes);
+      setEdges(data.edges);
+      setPan({ x: 50, y: 50 });
+      setScale(1);
+    }
+  };
+
+  const renameCustomBoard = (boardId, newName) => {
+    setCustomBoards(prev => prev.map(b => b.id === boardId ? { ...b, name: newName } : b));
+  };
+
+  const switchToCustomBoard = (boardId) => {
+    // Save current custom board state first
+    if (activeCustomBoard) {
+      setCustomBoards(prev => prev.map(b => b.id === activeCustomBoard ? { ...b, nodes, edges } : b));
+    }
+    const board = customBoards.find(b => b.id === boardId);
+    if (!board) return;
+    setActiveCustomBoard(boardId);
+    setNodes(board.nodes);
+    setEdges(board.edges);
+    setPan({ x: 50, y: 50 });
+    setScale(1);
+    setConnectMode(false);
+    setConnectSource(null);
+  };
+
+  // Save current custom board nodes/edges whenever they change
+  const saveCurrentCustomBoard = useCallback((newNodes, newEdges) => {
+    if (!activeCustomBoard) return;
+    setCustomBoards(prev => prev.map(b => b.id === activeCustomBoard ? { ...b, nodes: newNodes, edges: newEdges } : b));
+  }, [activeCustomBoard]);
+
+  const addCustomNode = (type) => {
+    const id = type + '_' + Date.now();
+    const labels = { start: '🟢 Inicio', filter: '🔶 Filtro', branch: '🔀 Rama', result: '✅ Resultado', error: '❌ Error' };
+    const newNode = {
+      id,
+      x: (-pan.x + 300) / scale,
+      y: (-pan.y + 200) / scale,
+      title: labels[type] || type,
+      text: lang === 'es' ? 'Escribe aquí...' : 'Write here...',
+      type,
+    };
+    const updated = [...nodes, newNode];
+    setNodes(updated);
+    saveCurrentCustomBoard(updated, edges);
+  };
+
+  const deleteCustomEdge = (edgeId) => {
+    const updated = edges.filter(e => e.id !== edgeId);
+    setEdges(updated);
+    saveCurrentCustomBoard(nodes, updated);
+  };
+
+  const handleConnectNode = (nodeId) => {
+    if (!connectMode) return;
+    if (!connectSource) {
+      setConnectSource(nodeId);
+    } else {
+      if (connectSource !== nodeId) {
+        // Show inline label input instead of prompt()
+        setPendingEdge({ from: connectSource, to: nodeId });
+      }
+      setConnectSource(null);
+      setConnectMode(false);
+    }
+  };
+
+  const confirmPendingEdge = (label) => {
+    if (!pendingEdge) return;
+    const newEdge = { id: 'e_' + Date.now(), from: pendingEdge.from, to: pendingEdge.to, label: label.trim() };
+    const updated = [...edges, newEdge];
+    setEdges(updated);
+    saveCurrentCustomBoard(nodes, updated);
+    setPendingEdge(null);
+  };
+
+  const cancelPendingEdge = () => setPendingEdge(null);
+
   const assessmentKeys = Object.keys(ASSESSMENTS.es);
 
   return (
@@ -224,6 +353,12 @@ function App() {
         lang={lang}
         setShowMobileMenu={setShowMobileMenu}
         showMobileMenu={showMobileMenu}
+        customBoards={customBoards}
+        activeCustomBoard={activeCustomBoard}
+        createCustomBoard={createCustomBoard}
+        deleteCustomBoard={deleteCustomBoard}
+        renameCustomBoard={renameCustomBoard}
+        switchToCustomBoard={switchToCustomBoard}
       />
       <div className="flex-1 relative overflow-hidden h-full">
         <Canvas
@@ -251,6 +386,18 @@ function App() {
           zoomIn={zoomIn}
           zoomOut={zoomOut}
           currentAssessment={currentAssessment}
+          isCustomBoard={!!activeCustomBoard}
+          connectMode={connectMode}
+          connectSource={connectSource}
+          setConnectMode={setConnectMode}
+          setConnectSource={setConnectSource}
+          addCustomNode={addCustomNode}
+          deleteCustomNode={deleteCustomNode}
+          deleteCustomEdge={deleteCustomEdge}
+          handleConnectNode={handleConnectNode}
+          pendingEdge={pendingEdge}
+          confirmPendingEdge={confirmPendingEdge}
+          cancelPendingEdge={cancelPendingEdge}
         />
       </div>
     </div>
