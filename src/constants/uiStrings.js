@@ -1,0 +1,38 @@
+export const UI_STRINGS = {
+  es: {
+    appTitle: 'Visualizador Assessment',
+    resetView: 'Restaurar Vista',
+    langToggle: 'EN',
+    hint: '🖱️ Arrastra para mover • Arrastra el fondo para desplazar',
+    tools: 'Herr.',
+    note: 'Nota',
+    questions: 'Preguntas',
+    view: 'Vista',
+    tabs: {
+      regularizacion: 'Reg. Extraordinaria 2026',
+      nomad: 'Nómada Digital',
+      work: 'Trabajo',
+      student: 'Visado Estudios',
+      non_lucrative: 'No Lucrativa',
+      job_seeker: 'Búsqueda Empleo',
+    },
+  },
+  en: {
+    appTitle: 'Assessment Viewer',
+    resetView: 'Reset View',
+    langToggle: 'ES',
+    hint: '🖱️ Drag nodes to move • Drag background to pan',
+    tools: 'Tools',
+    note: 'Note',
+    questions: 'Questions',
+    view: 'View',
+    tabs: {
+      regularizacion: 'Extraordinary Reg. 2026',
+      nomad: 'Digital Nomad',
+      work: 'Work Visa',
+      student: 'Student Visa',
+      non_lucrative: 'Non-Lucrative',
+      job_seeker: 'Job Seeker',
+    },
+  },
+};
